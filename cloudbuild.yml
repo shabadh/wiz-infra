@@ -1,0 +1,52 @@
+substitutions:
+  _GCP_PROJECT_ID: "clgcporg10-181"
+  _GCP_REGION: "europe-west1"
+  _TF_BUCKET: "wiz-infra-dev"
+  _GCP_REPO: "wiz-infra"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  # Step 1: Terraform format check
+  - id: 'terraform-fmt-check'
+    name: 'hashicorp/terraform:1.7.5'
+    args: ['fmt', '-check', '-recursive']
+    dir: 'wiz-infra'
+
+  #Step 2:Lint tf files
+  - id: 'terraform-lint'
+    name: 'gcr.io/terraform-linters/tflint:latest'
+    args: ['--init']
+    dir: 'wiz-infra'
+
+  # Step 3: Terraform init
+  - id: 'terraform-init'
+    name: 'hashicorp/terraform:1.7.5'
+    args: ['init']
+    dir: 'wiz-infra'  
+
+  # Step 4: Terraform validate
+  - id: 'terraform-validate'
+    name: 'hashicorp/terraform:1.7.5'
+    args: ['validate']
+    dir: 'wiz-infra'
+
+  # Step 5: Terraform plan
+  - id: 'terraform-plan'
+    name: 'hashicorp/terraform:1.7.5'
+    args: ['plan', '-out=tfplan']
+    dir: 'wiz-infra'
+
+  # Manual approval step
+  - id: 'manual-approval'
+    waitFor: ['terraform-plan']
+    name: 'gcr.io/cloud-builders/gcloud'
+    args: ['alpha', 'cloud-builds', 'approvals', 'wait', '$BUILD_ID', '--region=$_GCP_REGION']
+
+
+  # Step 6: Terraform apply
+  - id: 'terraform-apply'
+    name: 'hashicorp/terraform:1.7.5'
+    args: ['apply', '-input=false', 'tfplan']
+    dir: 'wiz-infra'  
